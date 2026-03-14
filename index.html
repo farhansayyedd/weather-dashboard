@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Weather Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;transition:all .3s ease}
+body{font-family:'Segoe UI',sans-serif;background:#0d1117;color:#e6edf3;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:32px 16px}
+h1{font-size:1.6rem;font-weight:700;color:#58a6ff;margin-bottom:24px;letter-spacing:-.02em}
+h1 span{color:#e6edf3}
+.search-bar{display:flex;gap:8px;width:100%;max-width:500px;margin-bottom:32px}
+.search-bar input{flex:1;padding:12px 18px;background:#161b22;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:1rem;outline:none}
+.search-bar input:focus{border-color:#58a6ff;box-shadow:0 0 0 3px rgba(88,166,255,.15)}
+.search-bar button{padding:12px 20px;background:#58a6ff;border:none;border-radius:8px;color:#0d1117;font-weight:700;cursor:pointer;font-size:.9rem}
+.search-bar button:hover{background:#79b8ff}
+.card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:28px;width:100%;max-width:500px;margin-bottom:16px}
+.city-name{font-size:1.8rem;font-weight:700;margin-bottom:4px}
+.date-time{font-size:.85rem;color:#8b949e;margin-bottom:20px}
+.main-temp{display:flex;align-items:center;gap:16px;margin-bottom:20px}
+.temp-big{font-size:4rem;font-weight:300;line-height:1}
+.weather-icon{font-size:3.5rem}
+.weather-desc{font-size:1rem;color:#8b949e;text-transform:capitalize}
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.stat{background:#0d1117;border-radius:8px;padding:12px;text-align:center}
+.stat-val{font-size:1.1rem;font-weight:600;color:#58a6ff}
+.stat-label{font-size:.72rem;color:#8b949e;margin-top:3px;text-transform:uppercase;letter-spacing:.06em}
+.forecast-title{font-size:.78rem;text-transform:uppercase;letter-spacing:.1em;color:#8b949e;margin-bottom:12px}
+.forecast-grid{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.forecast-day{background:#0d1117;border-radius:8px;padding:12px 10px;text-align:center;min-width:72px;flex-shrink:0}
+.fc-day{font-size:.75rem;color:#8b949e;margin-bottom:6px}
+.fc-icon{font-size:1.6rem;margin-bottom:6px}
+.fc-hi{font-size:.9rem;font-weight:600}
+.fc-lo{font-size:.78rem;color:#8b949e}
+.error{color:#f85149;text-align:center;padding:12px;background:#1c1119;border-radius:8px;border:1px solid #f851491a;margin-bottom:16px;display:none}
+.loading{text-align:center;color:#8b949e;font-size:.9rem;padding:16px;display:none}
+.recent{width:100%;max-width:500px;margin-bottom:16px}
+.recent-title{font-size:.75rem;color:#8b949e;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.recent-chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:#161b22;border:1px solid #30363d;border-radius:20px;padding:4px 14px;font-size:.78rem;cursor:pointer;color:#8b949e}
+.chip:hover{border-color:#58a6ff;color:#58a6ff}
+</style>
+</head>
+<body>
+<h1>⛅ Weather <span>Dashboard</span></h1>
+
+<div class="search-bar">
+  <input id="cityInput" type="text" placeholder="Search city..." onkeydown="if(event.key==='Enter')getWeather()"/>
+  <button onclick="getWeather()">Search</button>
+</div>
+
+<div id="recentSection" class="recent" style="display:none">
+  <div class="recent-title">Recent Searches</div>
+  <div id="recentChips" class="recent-chips"></div>
+</div>
+
+<div id="error" class="error"></div>
+<div id="loading" class="loading">Fetching weather data...</div>
+
+<div id="weatherCard" class="card" style="display:none">
+  <div id="cityDisplay" class="city-name"></div>
+  <div id="dateTime" class="date-time"></div>
+  <div class="main-temp">
+    <div id="weatherIcon" class="weather-icon"></div>
+    <div>
+      <div id="tempBig" class="temp-big"></div>
+      <div id="weatherDesc" class="weather-desc"></div>
+    </div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat"><div id="feelsLike" class="stat-val"></div><div class="stat-label">Feels Like</div></div>
+    <div class="stat"><div id="humidity" class="stat-val"></div><div class="stat-label">Humidity</div></div>
+    <div class="stat"><div id="windSpeed" class="stat-val"></div><div class="stat-label">Wind</div></div>
+  </div>
+</div>
+
+<div id="forecastCard" class="card" style="display:none">
+  <div class="forecast-title">5-Day Forecast</div>
+  <div id="forecastGrid" class="forecast-grid"></div>
+</div>
+
+<script>
+// ⚠️ Replace with your own free key from https://openweathermap.org/api
+const API_KEY = 'PASTE_YOUR_API_KEY_HERE';
+const BASE = 'https://api.openweathermap.org/data/2.5';
+
+const ICONS = {
+  '01':'☀️','02':'⛅','03':'☁️','04':'☁️','09':'🌧️','10':'🌦️','11':'⛈️','13':'❄️','50':'🌫️'
+};
+function getIcon(code){return ICONS[code.slice(0,2)]||'🌡️';}
+function formatDay(ts){return new Date(ts*1000).toLocaleDateString('en',{weekday:'short'});}
+function formatDate(){return new Date().toLocaleDateString('en',{weekday:'long',day:'numeric',month:'long'});}
+
+let recent = JSON.parse(localStorage.getItem('wdRecent')||'[]');
+
+function renderRecent(){
+  if(!recent.length){document.getElementById('recentSection').style.display='none';return;}
+  document.getElementById('recentSection').style.display='';
+  document.getElementById('recentChips').innerHTML = recent.map(c=>`<div class="chip" onclick="searchCity('${c}')">${c}</div>`).join('');
+}
+
+function saveRecent(city){
+  recent = [city,...recent.filter(c=>c!==city)].slice(0,5);
+  localStorage.setItem('wdRecent',JSON.stringify(recent));
+  renderRecent();
+}
+
+function searchCity(c){document.getElementById('cityInput').value=c;getWeather();}
+
+async function getWeather(){
+  const city = document.getElementById('cityInput').value.trim();
+  if(!city) return;
+  document.getElementById('error').style.display='none';
+  document.getElementById('weatherCard').style.display='none';
+  document.getElementById('forecastCard').style.display='none';
+  document.getElementById('loading').style.display='block';
+  try{
+    const [cur,fc] = await Promise.all([
+      fetch(`${BASE}/weather?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`).then(r=>{if(!r.ok)throw new Error('City not found');return r.json();}),
+      fetch(`${BASE}/forecast?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`).then(r=>r.json())
+    ]);
+    document.getElementById('cityDisplay').textContent = `${cur.name}, ${cur.sys.country}`;
+    document.getElementById('dateTime').textContent = formatDate();
+    document.getElementById('tempBig').textContent = `${Math.round(cur.main.temp)}°C`;
+    document.getElementById('weatherDesc').textContent = cur.weather[0].description;
+    document.getElementById('weatherIcon').textContent = getIcon(cur.weather[0].icon);
+    document.getElementById('feelsLike').textContent = `${Math.round(cur.main.feels_like)}°C`;
+    document.getElementById('humidity').textContent = `${cur.main.humidity}%`;
+    document.getElementById('windSpeed').textContent = `${Math.round(cur.wind.speed)} m/s`;
+    // 5-day forecast (noon readings)
+    const days = fc.list.filter(i=>i.dt_txt.includes('12:00:00')).slice(0,5);
+    document.getElementById('forecastGrid').innerHTML = days.map(d=>`
+      <div class="forecast-day">
+        <div class="fc-day">${formatDay(d.dt)}</div>
+        <div class="fc-icon">${getIcon(d.weather[0].icon)}</div>
+        <div class="fc-hi">${Math.round(d.main.temp_max)}°</div>
+        <div class="fc-lo">${Math.round(d.main.temp_min)}°</div>
+      </div>`).join('');
+    document.getElementById('weatherCard').style.display='';
+    document.getElementById('forecastCard').style.display='';
+    saveRecent(cur.name);
+  }catch(e){
+    document.getElementById('error').textContent = e.message==='City not found'?'❌ City not found. Try another name.':'❌ API key missing or invalid. See README.';
+    document.getElementById('error').style.display='';
+  }finally{document.getElementById('loading').style.display='none';}
+}
+// Geolocation on load
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(pos=>{
+    fetch(`${BASE}/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&appid=${API_KEY}&units=metric`)
+      .then(r=>r.json()).then(d=>{document.getElementById('cityInput').value=d.name;getWeather();}).catch(()=>{});
+  },()=>{});
+}
+renderRecent();
+</script>
+</body>
+</html>
